@@ -4,32 +4,29 @@ from typing import List, Tuple
 import numpy as np
 
 class ThreeFilters:
-    def __init__(self, satelliteCandidates:List[Satellite]):
-        self.satelliteCandidates = satelliteCandidates
-    
-    def set_primary(self, primary:Satellite):
+    def __init__(self):
+        pass
+
+    def set_primary_N_secondaries(self, primary:Satellite, secondaries:List[Satellite]):
         self.primary = primary
-        self.satelliteCandidates.remove(primary)
+        self.satelliteCandidates = secondaries
     
     def set_separation_distance(self, separationDistance:float, padding:float):
         self.separationDistance = separationDistance
         self.padding = padding
     
     def pairwise_filter_satellite_candidates(self):
-        # print('\tTotal : {}'.format(len(self.satelliteCandidates)))
         self._perigee_apogee_filter()
-        # print('\tPerigee Apogee Filter : {}'.format(len(self.filteredCandidates)))  
-        self._orbit_path_filter()
-        # print('\tOrbit Path Filter : {}'.format(len(self.filteredCandidates)))
-        self._time_filter()
-        # print('\tTime Filter : {}'.format(len(self.filteredCandidates)))
+        self._orbit_time_filter()
+        # self._orbit_path_filter()
+        # self._time_filter()
     
         return self.filteredCandidates
     
     def _perigee_apogee_filter(self):
         primary = self.primary
         
-        self.filteredCandidates:List[Satellite] = []
+        self.filteredCandidates = []
         for secondary in self.satelliteCandidates:           
             smallQ = max(primary.perigee, secondary.perigee)
             largeQ = min(primary.apogee, secondary.apogee)
@@ -40,7 +37,7 @@ class ThreeFilters:
     def _orbit_path_filter(self):
         primary = self.primary
         
-        filteredCandidates:List[Satellite] = []
+        filteredCandidates = []
         for secondary in self.filteredCandidates:
             posDiff = np.linalg.norm(primary.positions - secondary.positions, axis=1)
             minPos = posDiff.min()
@@ -55,7 +52,7 @@ class ThreeFilters:
         primaryNormalVector = np.mean(primaryNormalVectors, axis=0)
         primaryNormalVectorMagnitude = np.linalg.norm(primaryNormalVector)
         
-        filteredCandidates:List[Tuple(Satellite, List)] = []
+        filteredCandidates = []
         for secondary in self.filteredCandidates:
             secondaryNormalVectors = np.cross(secondary.positions, secondary.velocities)
             secondaryNormalVector = np.mean(secondaryNormalVectors, axis=0)
@@ -85,4 +82,27 @@ class ThreeFilters:
                 timeSpan.append((intersectionIndices[diff[-1]], intersectionIndices[-1]))
             
             filteredCandidates.append((secondary, timeSpan))
+        self.filteredCandidates = filteredCandidates
             
+    def _orbit_time_filter(self):
+        primary = self.primary
+
+        filteredCandidates = []
+        for secondary in self.filteredCandidates:
+            posDiff = np.linalg.norm(primary.positions - secondary.positions, axis=1)
+            minPos = posDiff.min()
+            if minPos > self.separationDistance + self.padding:
+                continue             
+
+            posDiffIndices = np.where(posDiff <= self.separationDistance + self.padding)[0]
+            diff = np.where(np.diff(posDiffIndices) != 1)[0] + 1
+            if diff.size == 0:
+                timeSpan = [(posDiffIndices[0], posDiffIndices[-1])]
+            else:
+                timeSpan = [(posDiffIndices[0], posDiffIndices[diff[0]-1])]
+                for i in range(len(diff)-1):
+                    timeSpan.append((posDiffIndices[diff[i]], posDiffIndices[diff[i+1]-1]))
+                timeSpan.append((posDiffIndices[diff[-1]], posDiffIndices[-1]))
+            
+            filteredCandidates.append((secondary.satnum, timeSpan))
+        self.filteredCandidates = filteredCandidates 

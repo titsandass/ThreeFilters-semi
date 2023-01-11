@@ -1,4 +1,3 @@
-from sgp4.api import SGP4_ERRORS
 import numpy as np
 
 class Satellite(object):
@@ -6,12 +5,14 @@ class Satellite(object):
         from sgp4 import exporter
         
         self._name = name
-        self._satrec = satrec
+        # self._satrec = satrec
+        self._satnum = satrec.satnum
+        self._incliniation = satrec.inclo
         self._positions = positions
         self._norms = np.linalg.norm(self._positions, axis=1)
         self._velocities = velocities
     
-        self._TLE = exporter.export_tle(self._satrec)
+        self._TLE = exporter.export_tle(satrec)
         self._perigee = self._norms.min()
         self._apogee = self._norms.max()
     
@@ -20,12 +21,12 @@ class Satellite(object):
         return self._name    
     
     @property
-    def satrec(self):
-        return self._satrec    
-    
+    def satnum(self):
+        return self._satnum
+
     @property
     def inclination(self):
-        return self._satrec.inclo
+        return self._incliniation
     
     @property
     def positions(self):

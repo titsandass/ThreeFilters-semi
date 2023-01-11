@@ -6,13 +6,25 @@ from sgp4.api import Satrec, SatrecArray, jday
 import numpy as np
 from tqdm import tqdm
 import pickle
+from multiprocessing import Pool
+
+def runFilter(separationDistance, padding, primary, secondaries):
+    threeFilters = ThreeFilters()
+    
+    threeFilters.set_separation_distance(separationDistance=separationDistance, padding=padding)
+    threeFilters.set_primary_N_secondaries(primary=primary, secondaries=secondaries)
+    filteredCandidates = threeFilters.pairwise_filter_satellite_candidates()
+
+    return filteredCandidates
+
+workers = 100
 
 #PARAMETERS
 tleFileName = './TLE/tle_all.txt'
 timeWindow = (datetime(2023,1,4,0,0,0), datetime(2023,1,5,0,0,0))
-timeStep = timedelta(seconds=4)
+timeStep = timedelta(seconds=1)
 separationDistance:float = 10
-padding:float = 30
+padding:float = 10
 
 #PARSE TLE FILES
 TLEs = []
@@ -47,16 +59,13 @@ for i, satrec in enumerate(tqdm(satrecs, desc='Satellite Instances')):
     satellites.append(Satellite(name=TLEs[i][0][2:], satrec=satrec, positions=positions[i], velocities=velocities[i]))
 print('\tPROPAGATION ERROR IN {} SATS'.format(len(propagationErrors)))
 
-#FILTER
-threeFilters = ThreeFilters()
-filteredCandidatesList = []
-threeFilters.set_separation_distance(separationDistance=separationDistance, padding=padding)
-for i, primary in enumerate(tqdm(satellites, desc='Filtering')):
-    threeFilters.set_primary_N_secondaries(primary=primary, secondaries=satellites[i+1:])
-    filteredCandidates = threeFilters.pairwise_filter_satellite_candidates()
-    filteredCandidatesList.append(filteredCandidates)
+# runFilter(separationDistance, padding, primary, secondaries)
+arguments = [(separationDistance, padding, satellites[i], satellites[i+1:]) for i in range(len(satellites))]
+with Pool(workers) as p:
+    filteredCandidatesList = p.starmap(runFilter, arguments)
 
-filteredCandidatesFileName = './filteredCandidates_{}_{}_{}.pickle'.format(timeStep, separationDistance, padding)
+# filteredCandidatesList = []
+filteredCandidatesFileName = './filteredCandidates_multiprocess_{}_{}_{}.pickle'.format(timeStep, separationDistance, padding)
 with open(filteredCandidatesFileName, 'wb') as f:
     pickle.dump(filteredCandidatesList, f)
 pass
