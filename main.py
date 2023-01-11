@@ -20,6 +20,8 @@ with open(tleFileName, 'r') as f:
     lines = f.readlines()
     TLEs = [(lines[3*i].rstrip(), lines[3*i+1].rstrip(), lines[3*i+2].rstrip()) for i in range(int(len(lines)/3))]
 
+# TLEs = [TLEs[0],TLEs[1098]]
+
 #PARSE JD, FR
 windowSize = int((timeWindow[1]-timeWindow[0])/timeStep)
 currtime = timeWindow[0]
@@ -51,8 +53,8 @@ print('\tPROPAGATION ERROR IN {} SATS'.format(len(propagationErrors)))
 threeFilters = ThreeFilters()
 filteredCandidatesList = []
 threeFilters.set_separation_distance(separationDistance=separationDistance, padding=padding)
-for i, primary in enumerate(tqdm(satellites, desc='Filtering')):
-    threeFilters.set_primary_N_secondaries(primary=primary, secondaries=satellites[i+1:])
+for i in tqdm(range(len(satellites)), desc='Filtering'):
+    threeFilters.set_primary_N_secondaries(primary=satellites[i], secondaries=satellites[i+1:])
     filteredCandidates = threeFilters.pairwise_filter_satellite_candidates()
     filteredCandidatesList.append(filteredCandidates)
 

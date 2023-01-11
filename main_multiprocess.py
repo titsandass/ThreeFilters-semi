@@ -2,17 +2,20 @@ from satellite import Satellite
 from threefilters import ThreeFilters
 
 from datetime import datetime, timedelta
-from sgp4.api import Satrec, SatrecArray, jday
+from sgp4.api import Satrec, SatrecArray
+from sgp4.conveniences import jday_datetime
 import numpy as np
 from tqdm import tqdm
 import pickle
 from multiprocessing import Pool
 
-def runFilter(separationDistance, padding, primary, secondaries):
+global satellites
+
+def runFilter(separationDistance, padding, primaryIdx):
     threeFilters = ThreeFilters()
     
     threeFilters.set_separation_distance(separationDistance=separationDistance, padding=padding)
-    threeFilters.set_primary_N_secondaries(primary=primary, secondaries=secondaries)
+    threeFilters.set_primary_N_secondaries(primary=satellites[primaryIdx], secondaries=satellites[primaryIdx+1:])
     filteredCandidates = threeFilters.pairwise_filter_satellite_candidates()
 
     return filteredCandidates
@@ -38,7 +41,7 @@ currtime = timeWindow[0]
 
 jds, frs = np.empty(windowSize, dtype=np.float32), np.empty(windowSize, dtype=np.float32)
 for i in range(windowSize):
-    jd, fr = jday(currtime.year, currtime.month, currtime.day, currtime.hour, currtime.minute, currtime.second)
+    jd, fr = jday_datetime(currtime)
 
     jds[i], frs[i] = jd, fr
     currtime += timeStep 
@@ -50,6 +53,7 @@ for _ in tqdm(range(1), desc='Propagating Satellites'):
     errors, positions, velocities = satrecArray.sgp4(jds, frs)   
 
 #GENERATE SATELLITE CLASS OBJECTS
+
 satellites = []
 propagationErrors = []
 for i, satrec in enumerate(tqdm(satrecs, desc='Satellite Instances')):
@@ -60,7 +64,7 @@ for i, satrec in enumerate(tqdm(satrecs, desc='Satellite Instances')):
 print('\tPROPAGATION ERROR IN {} SATS'.format(len(propagationErrors)))
 
 # runFilter(separationDistance, padding, primary, secondaries)
-arguments = [(separationDistance, padding, satellites[i], satellites[i+1:]) for i in range(len(satellites))]
+arguments = [(separationDistance, padding, i) for i in range(len(satellites))]
 with Pool(workers) as p:
     filteredCandidatesList = p.starmap(runFilter, arguments)
 

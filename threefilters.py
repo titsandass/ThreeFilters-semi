@@ -89,20 +89,21 @@ class ThreeFilters:
 
         filteredCandidates = []
         for secondary in self.filteredCandidates:
-            posDiff = np.linalg.norm(primary.positions - secondary.positions, axis=1)
-            minPos = posDiff.min()
-            if minPos > self.separationDistance + self.padding:
+            dist = np.linalg.norm(primary.positions - secondary.positions, axis=1)
+            minDist = dist.min()
+            if minDist > self.separationDistance + self.padding:
                 continue             
 
-            posDiffIndices = np.where(posDiff <= self.separationDistance + self.padding)[0]
-            diff = np.where(np.diff(posDiffIndices) != 1)[0] + 1
-            if diff.size == 0:
-                timeSpan = [(posDiffIndices[0], posDiffIndices[-1])]
+            distUnderSD_Idx = np.where(dist <= self.separationDistance + self.padding)[0]
+
+            diffIdx = np.where(np.diff(distUnderSD_Idx) != 1)[0] + 1
+            if diffIdx.size == 0:
+                timeSpan = [(distUnderSD_Idx[0], distUnderSD_Idx[-1])]
             else:
-                timeSpan = [(posDiffIndices[0], posDiffIndices[diff[0]-1])]
-                for i in range(len(diff)-1):
-                    timeSpan.append((posDiffIndices[diff[i]], posDiffIndices[diff[i+1]-1]))
-                timeSpan.append((posDiffIndices[diff[-1]], posDiffIndices[-1]))
+                timeSpan = [(distUnderSD_Idx[0], distUnderSD_Idx[diffIdx[0]-1])]
+                for i in range(len(diffIdx)-1):
+                    timeSpan.append((distUnderSD_Idx[diffIdx[i]], distUnderSD_Idx[diffIdx[i+1]-1]))
+                timeSpan.append((distUnderSD_Idx[diffIdx[-1]], distUnderSD_Idx[-1]))
             
             filteredCandidates.append((secondary.satnum, timeSpan))
         self.filteredCandidates = filteredCandidates 
