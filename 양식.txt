@@ -4,4 +4,6 @@ primary   Secondary DCA(km)   Start Interval          TCA                     En
 11        48290     9.860     2023-01-04T12:05:54.042 2023-01-04T12:05:57.353 2023-01-04T12:06:00.000
 12        30086     6.312     2023-01-04T19:50:48.149 2023-01-04T19:50:50.713 2023-01-04T19:50:53.306
 
-11만개
+https://devocean.sk.com/blog/techBoardDetail.do?ID=163675
+https://docs.python.org/3/library/multiprocessing.shared_memory.html
+https://stackoverflow.com/questions/7894791/use-numpy-array-in-shared-memory-for-multiprocessing
