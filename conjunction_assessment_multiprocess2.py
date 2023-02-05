@@ -13,12 +13,9 @@ global threshold
 global TLEs
 global satrecs
 global satrecNums
-global satrecNums2
 
 #primary 24392
 #conjunctions 328671
-#global을 함수 안에
-#propagate를 밖으로뺄순없을까?
 
 def conjunction_assessment(primaryIdx, shm_satrecNums):
     CAResult = []
@@ -27,33 +24,34 @@ def conjunction_assessment(primaryIdx, shm_satrecNums):
         return CAResult
 
     for secondaryNum, timeSpans in filteredCandidates[primaryIdx]:
-        secondaryIdx = satrecNums.index(secondaryNum)
-        secondary = satrecs[secondaryIdx]
+        secondary = satrecs[satrecNums.index(secondaryNum)]
         satrecArray = SatrecArray([primary, secondary])
-
+        
+        jds, frs = [], []
         for startT, endT in timeSpans:
-            startDateTime  = min(timeWindow[0] + (startT - 1)*FilterTimeStep, timeWindow[0])
-            endDateTime    = max(timeWindow[0] + (endT   - 1)*FilterTimeStep, timeWindow[1])
-            windowSize = int((endDateTime-startDateTime)/CATimeStep)
+            startDateTime   = min(timeWindow[0] + startT*FilterTimeStep - FilterTimeStep, timeWindow[0])
+            endDateTime     = max(timeWindow[0] + endT*FilterTimeStep + FilterTimeStep, timeWindow[1])
+            windowSize      = int((endDateTime-startDateTime)/CATimeStep)
 
-            jds, frs = np.empty(windowSize, dtype=np.float32), np.empty(windowSize, dtype=np.float32)
             for i in range(windowSize):
                 jd, fr = jday_datetime(startDateTime + i*CATimeStep)
-                jds[i], frs[i] = jd, fr
+                jds.append(jd)
+                frs.append(fr)
+                
+        jds, frs = np.array(jds, dtype=np.float32), np.array(frs, dtype=np.float32)
+        _, positions, _ = satrecArray.sgp4(jds, frs)
+        primaryPositions, secondaryPositions = positions        
 
-            _, positions, _ = satrecArray.sgp4(jds, frs)
-            primaryPositions, secondaryPositions = positions
+        dist = np.linalg.norm(primaryPositions-secondaryPositions, axis=1)
+        distUnderThreshold_idx = np.where(dist <= threshold)[0]
+        if distUnderThreshold_idx.size == 0:
+            continue
 
-            dist = np.linalg.norm(primaryPositions-secondaryPositions, axis=1)
-            distUnderThreshold_idx = np.where(dist <= threshold)[0]
-            if distUnderThreshold_idx.size == 0:
-                continue
+        DCA = dist.min()
+        TCA = startDateTime + np.argmin(dist)*CATimeStep
+        TCAStart, TCAEnd = startDateTime + CATimeStep*distUnderThreshold_idx[0], startDateTime + CATimeStep*distUnderThreshold_idx[-1]
 
-            DCA = dist.min()
-            TCA = startDateTime + np.argmin(dist)*CATimeStep
-            TCAStart, TCAEnd = startDateTime + CATimeStep*distUnderThreshold_idx[0], startDateTime + CATimeStep*distUnderThreshold_idx[-1]
-
-            CAResult.append((primary.satnum, secondary.satnum, DCA, TCAStart.strftime(timeformat), TCA.strftime(timeformat), TCAEnd.strftime(timeformat)))
+        CAResult.append((primary.satnum, secondary.satnum, DCA, TCAStart.strftime(timeformat), TCA.strftime(timeformat), TCAEnd.strftime(timeformat)))
     shm_satrecNums.remove(primary.satnum)
     print('{} SATs Left'.format(len(shm_satrecNums)))
 
@@ -82,11 +80,14 @@ shm_satrecNums = manager.list()
 shm_satrecNums.extend(satrecNums)
 
 CAResults = []
-arguments = [(i, shm_satrecNums) for i in range(len(filteredCandidates))]
-with Pool(workers) as pool:
-    CAResults = pool.starmap(conjunction_assessment, arguments[-1400:])
+
+a = conjunction_assessment(0, shm_satrecNums)
+
+# arguments = [(i, shm_satrecNums) for i in range(len(filteredCandidates))]
+# with Pool(workers) as pool:
+#     CAResults = pool.starmap(conjunction_assessment, arguments)
     
-with open('./ca_multiprocess_1400.pickle', 'wb') as f:
+with open('./ca_multiprocess.pickle', 'wb') as f:
     pickle.dump(CAResults, f)       
 
     # with open('./result/CA/{}_{}.txt'.format(timeWindow[0].strftime(timeformat), timeWindow[1].strftime(timeformat)), 'w') as f:

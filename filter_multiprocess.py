@@ -7,11 +7,12 @@ from sgp4.conveniences import jday_datetime
 import numpy as np
 from tqdm import tqdm
 import pickle
-from multiprocessing import Pool, shared_memory
+from multiprocessing import Pool
 
 global satellites
 
-def runFilter(separationDistance, padding, primaryIdx):
+def runFilter(separationDistance, padding, primaryIdx,):
+    print('primary : {}'.format(''))
     threeFilters = ThreeFilters()
     
     threeFilters.set_separation_distance(separationDistance=separationDistance, padding=padding)
@@ -20,7 +21,7 @@ def runFilter(separationDistance, padding, primaryIdx):
 
     return filteredCandidates
 
-workers = 100
+workers = 60
 
 #PARAMETERS
 tleFileName = './TLE/tle_all.txt'
@@ -52,21 +53,22 @@ for _ in tqdm(range(1), desc='Propagating Satellites'):
     satrecArray = SatrecArray(satrecs)
     errors, positions, velocities = satrecArray.sgp4(jds, frs)   
 
-
 #GENERATE SATELLITE CLASS OBJECTS
 
-satellites = []
 propagationErrors = []
-for i, satrec in enumerate(tqdm(satrecs, desc='Satellite Instances')):
-    if np.any(errors[i]):
+for i in range(len(satrecs)):
+    if errors[i].any():
         propagationErrors.append(i)
-        continue
-    satellites.append(Satellite(name=TLEs[i][0][2:], satrec=satrec, positions=positions[i], velocities=velocities[i]))
 print('\tPROPAGATION ERROR IN {} SATS'.format(len(propagationErrors)))
 
-shm_sats = shared_memory.SharedMemory(create=True, size=0)
+satellites = []
+for i, satrec in enumerate(tqdm(satrecs, desc='Satellite Instances')):
+    if i in propagationErrors:
+        continue
+    satellites.append(Satellite(name=TLEs[i][0][2:], satrec=satrec, positions=positions[i], velocities=velocities[i]))
+satellites = np.array(satellites,dtype=object)
 
-# runFilter(separationDistance, padding, primary, secondaries)
+# runFilter(separationDistance, padding, primaryIdx)
 arguments = [(separationDistance, padding, i) for i in range(len(satellites))]
 with Pool(workers) as p:
     filteredCandidatesList = p.starmap(runFilter, arguments)
